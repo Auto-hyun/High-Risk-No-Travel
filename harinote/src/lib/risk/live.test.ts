@@ -104,7 +104,10 @@ describe("getLiveRiskInput — 전체 실패 폴백", () => {
     const second = await getLiveRiskInput({ ...place, contentId: 226001 });
     expect(second).toEqual(expected({ ...place, contentId: 226001 }));
 
-    expect(warnSpy).toHaveBeenCalledTimes(1);
+    // 경고는 종류별 1회씩만 — 기상·미세먼지 전체 실패 1 + 산사태 조회 실패 1.
+    // 두 번째 호출(같은 시군의 다른 관광지)에서는 어느 쪽도 다시 찍히지 않는다.
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+    expect(warnSpy.mock.calls.filter((c) => String(c[0]).includes("산사태"))).toHaveLength(1);
   });
 });
 

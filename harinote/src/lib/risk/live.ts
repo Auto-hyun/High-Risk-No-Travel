@@ -1,8 +1,8 @@
 /**
- * 실데이터 RiskInput 조립 — 기상청 단기예보 + AirKorea PM2.5 + 산림청 산불위험지수.
+ * 실데이터 RiskInput 조립 — 기상청 단기예보 + AirKorea PM2.5 + 산림청 산불위험지수·산사태 예보발령.
  *
  * 점진적 실데이터화: mockRiskInputFor를 베이스로
- * tempC·rainProbPct·rainMm·windMs·pm25·forestFireLevel은 실데이터로 덮어쓰고,
+ * tempC·rainProbPct·rainMm·windMs·pm25·forestFireLevel·landslideLevel은 실데이터로 덮어쓰고,
  * emergencyRoomKm는 내장 좌표(hospitals.gangwon.json)로 실계산한다.
  * (산불위험은 활용신청 승인 완료로 실데이터 — 2026-07-28 스모크 확인.
  * 키가 만료·차단돼 Forbidden이 되면 해당 필드만 mock으로 자동 폴백된다.)
@@ -19,6 +19,7 @@ import { fetchKmaDailyWeather } from "./kma";
 import { fetchMidDailyWeather } from "./kma-mid";
 import { getGangwonPm25 } from "./airkorea";
 import { fetchForestFireLevel } from "./forest";
+import { fetchLandslideLevel } from "./landslide";
 import { nearestHospitalKm } from "./medical";
 import { SIGUNGU_SEATS } from "./regions";
 
@@ -29,6 +30,8 @@ export function hasLiveRiskKeys(): boolean {
 
 /** 전체 실패 경고는 프로세스당 1회만 — 2,091곳 순회 시 로그 폭주 방지 */
 let warnedAllSourcesFailed = false;
+/** 산사태 조회 실패 경고도 프로세스당 1회 */
+let warnedLandslideFailed = false;
 
 /**
  * 기상청 격자 선택.
@@ -62,16 +65,25 @@ export async function getLiveRiskInput(
   // 격자 선택: 기본은 시군 대표점, 산악형은 자기 좌표 (gridPointFor 참고)
   const { nx, ny } = gridPointFor(place);
 
-  const [weather, pm25, forestFire] = await Promise.allSettled([
+  // 산불·산사태는 같은 게이트를 쓴다 (시군 코드 + 실연동 키)
+  const gatedSigungu =
+    place.sigunguCode !== undefined && hasLiveRiskKeys() ? place.sigunguCode : undefined;
+
+  const [weather, pm25, forestFire, landslide] = await Promise.allSettled([
     fetchKmaDailyWeather(nx, ny),
     getGangwonPm25(place.sigunguCode),
     // 시군 코드가 없거나 실연동 키가 없으면 산불 조회는 건너뛴다 (rejected → mock 유지).
     // hasLiveRiskKeys 게이트: 키 없는 환경(clean checkout·CI)에서 forest가
     // TOUR_API_KEY 폴백으로 네트워크를 태우지 않도록 — "키 없으면 네트워크 0" 불변식 유지
-    place.sigunguCode !== undefined && hasLiveRiskKeys()
-      ? fetchForestFireLevel(place.sigunguCode)
+    gatedSigungu !== undefined
+      ? fetchForestFireLevel(gatedSigungu)
       : Promise.reject(
           new Error("실연동 키/시군코드 없음 — 산불위험 조회 생략"),
+        ),
+    gatedSigungu !== undefined
+      ? fetchLandslideLevel(gatedSigungu)
+      : Promise.reject(
+          new Error("실연동 키/시군코드 없음 — 산사태 예보발령 조회 생략"),
         ),
   ]);
 
@@ -124,11 +136,19 @@ export async function getLiveRiskInput(
     input.forestFireLevel = forestFire.value;
   }
 
-  // 산사태: 평상시엔 score.ts가 예보 강수량×지형으로 프록시 계산한다(입력 불필요).
-  // 산림청 산사태 예보발령 API(data.go.kr/15074798) 활용신청 승인·게이트웨이 전파 후,
-  // 활성 발령이 있는 시군구면 input.landslideLevel = 1|2 로 세팅하면
-  // score.ts가 max(프록시, 공식)으로 상향 반영한다 (없으면 미설정 → 프록시 유지).
-  // TODO(landslide): 승인 후 fetchLandslideAlert(sigunguCode) 추가 — 스모크로 응답 필드 확정 뒤 배선.
+  // 산사태 — 산림청 공식 예보발령만 쓴다(자체 추정 없음).
+  // 조회가 실패하면 미설정 = 발령 없음(감점 0)과 구분되지 않는다. 다른 축은 실패해도
+  // mock 값이 남지만 산사태만은 위험이 통째로 사라지므로 경고를 남긴다(프로세스당 1회).
+  if (landslide.status === "fulfilled") {
+    input.landslideLevel = landslide.value;
+  } else if (gatedSigungu !== undefined && !warnedLandslideFailed) {
+    warnedLandslideFailed = true;
+    const reason = landslide.reason;
+    console.warn(
+      "[risk/live] 산사태 예보발령 조회가 실패해 산사태 축이 '발령 없음'으로 계산됩니다.",
+      reason instanceof Error ? reason.message : reason,
+    );
+  }
 
   if (weatherValue === undefined && pm25.status === "rejected") {
     if (!warnedAllSourcesFailed) {
