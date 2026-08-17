@@ -205,48 +205,24 @@ export function forestFirePoints(level: number): number {
 }
 
 // ─────────────────────────────────────────────
-// 산사태 (Disaster, 상한 80 — 경보를 방문자제 등급에 앵커) — 강우×지형 프록시 + 산림청 예보발령 override
+// 산사태 (Disaster, 상한 80 — 경보를 방문자제 등급에 앵커) — 산림청 공식 예보발령만 사용
 // ─────────────────────────────────────────────
 /**
- * 산사태 위험 0~2 (0 없음 / 1 주의보 수준 / 2 경보 수준).
+ * 산사태 위험 0~2 (0 발령 없음 / 1 주의보 / 2 경보).
  * 근거: 산림청 산사태정보시스템 예보발령은 토양함수지수(누적 강우로 산정한 토양 속
  *   빗물량)로 발령한다 — 권역 토양함수지수 80% 도달 시 주의보, 100% 시 경보.
- *   실시간 예보발령 API(data.go.kr/15074798) 승인·전파 전까지는 예보 강수량과
- *   지형 취약도(급경사 산지·계곡 토석류)로 근사한다. 공식 발령이 들어오면
- *   score.ts가 max(프록시, 공식)으로 상향만 반영한다.
+ *   실시간 예보발령 API(data.go.kr/15074798)를 15분 캐시로 조회하고(risk/landslide.ts),
+ *   발령이 있는 시군만 감점한다. 자체 추정(강수량×지형 프록시)은 쓰지 않는다 —
+ *   발령 권한이 있는 기관의 판단만 산사태 축의 근거로 삼는다는 결정(2026-08).
+ *   발령은 시군 단위이므로 같은 시군의 관광지는 실내·야외 구분 없이 같은 단계를 받는다.
  *   산불(건조)과 산사태(강우)는 상반된 기상 조건에서 발생 → 동시에 높기 어렵다.
  */
 export const LANDSLIDE = {
-  LEVEL_LABEL: { 0: "없음", 1: "주의보 수준", 2: "경보 수준" } as Record<
-    0 | 1 | 2,
-    string
-  >,
+  LEVEL_LABEL: { 0: "없음", 1: "주의보", 2: "경보" } as Record<0 | 1 | 2, string>,
   /** 단계별 감점 — 발령을 여행 권고 등급에 앵커: 주의보 45→총점 ≤55(주의), 경보 80→≤20(방문자제) */
   POINTS_BY_LEVEL: { 0: 0, 1: 45, 2: 80 } as Record<0 | 1 | 2, number>,
-  /** 일 강수량 트리거(mm) — 기상청 호우주의보(3h 60mm)·산사태 강우기준을 일강수로 근사 */
-  WATCH_RAIN_MM: 40,
-  WARN_RAIN_MM: 80,
   MAX_POINTS: 80,
-  /**
-   * 시군 대표점수의 산사태 감점 상한(점) — 노출 비율×이 값.
-   * 관광지 1곳의 감점(45/80)을 시군 헤드라인에 그대로 박으면 산지를 낀 시군이 전부
-   * 침몰하므로, 시군 안에서 위험 구역에 걸친 비율만큼만 깎는다.
-   * 실측(analysis): 50mm 강수 시 인제 61%→−9, 강릉 2%→0.
-   */
-  REGION_CAP: 15,
 } as const;
-
-/**
- * 환경유형별 산사태 취약도 — 급경사 산지·계곡(토석류 경로)이 높고, 평지·해안은 낮으며
- * 실내는 직접 노출이 없다. envType이 경사·지형을 대리하는 프록시 신호다.
- */
-const LANDSLIDE_SUSCEPTIBILITY: Record<PlaceEnvType, number> = {
-  indoor: 0,
-  outdoor_mountain: 1.0,
-  outdoor_water: 0.9, // 계곡·수변 = 집중호우 시 토석류 경로
-  outdoor_coast: 0.4,
-  outdoor_general: 0.4,
-};
 
 /** 외부값(음수·3 등) 유입 시 0~2로 clamp */
 export function normalizeLandslideLevel(level: number): 0 | 1 | 2 {
@@ -255,19 +231,21 @@ export function normalizeLandslideLevel(level: number): 0 | 1 | 2 {
 }
 
 /**
- * 예보 강수량(mm)×지형 취약도 → 산사태 위험 프록시 0~2.
- * 취약도 낮은 지형(해안·평지)은 같은 비여도 사면 붕괴 위험이 낮아 한 단계 완화한다.
+ * 감점에 쓰는 실효 단계 — 실내 시설은 발령 단계를 한 단계 완화한다
+ * (주의보 → 감점 없음, 경보 → 주의보 밴드 45점).
+ * 근거: 발령은 시군 단위라 도심 상가 음식점도 그대로 맞으면 산지와 같은 감점을 받는다.
+ *   산사태 피해는 사면에 인접한 야외 활동에 집중되므로 실내는 한 단계 낮춰 본다.
+ *   다만 경보는 주민 대피 단계라 0으로 면제하지 않는다(주의 등급에는 남는다).
+ * 다른 축(기상·산불)이 쓰는 실내 할인 ×0.3 대신 이산 규칙을 쓰는 이유:
+ *   산사태 밴드(45/80)가 커서 배율의 ±20% 교란이 실내 셀의 등급을 뒤집는다
+ *   (실측 등급 유지율 84.2% < 게이트 85%, analysis/24). 이산 규칙은 그 흔들림이 없다.
  */
-export function landslideProxyLevel(
-  rainMm: number | undefined,
+export function landslideEffectiveLevel(
+  level: 0 | 1 | 2,
   envType: PlaceEnvType,
 ): 0 | 1 | 2 {
-  const s = LANDSLIDE_SUSCEPTIBILITY[envType];
-  if (!rainMm || s <= 0) return 0;
-  let level: 0 | 1 | 2 =
-    rainMm >= LANDSLIDE.WARN_RAIN_MM ? 2 : rainMm >= LANDSLIDE.WATCH_RAIN_MM ? 1 : 0;
-  if (s < 0.5 && level > 0) level = (level - 1) as 0 | 1 | 2;
-  return level;
+  if (envType !== "indoor" || level === 0) return level;
+  return (level - 1) as 0 | 1;
 }
 
 export function landslidePoints(level: number): number {
@@ -376,6 +354,7 @@ export interface EnvWeight {
 //  - 4단계(매우높음)는 입산통제·대피급이라 지형 무관하게 방문자제 밴드에 남긴다
 //  - 산악 가중 1.3은 설계값이라 실증 보정 전까지 미적용 — 적용 시 산불 3단계에서
 //    산악 관광지 216곳이 일괄 방문자제가 되는데 그 배율의 근거가 아직 없다
+// 산사태는 배율이 아니라 이산 규칙(실내 한 단계 완화)을 쓴다 — landslideEffectiveLevel 참조.
 export const ENV_WEIGHT: Record<PlaceEnvType, EnvWeight> = {
   /** 실내는 기상 영향이 낮다. 산불도 직접 노출이 낮아 동일하게 0.3 —
    * 도심 상가 음식점이 시군 산불 단계를 그대로 감점받는 왜곡 방지 */

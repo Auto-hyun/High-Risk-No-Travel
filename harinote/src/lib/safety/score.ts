@@ -33,7 +33,8 @@ import {
   type SafetyTuning,
   gradeForScore,
   heavyRainPoints,
-  landslideProxyLevel,
+  landslideEffectiveLevel,
+  normalizeLandslideLevel,
   normalizeForestFireLevel,
   levelForPoints,
   medicalPoints,
@@ -234,7 +235,7 @@ export function computeSafetyScore(
 
   // ── 안전층: 호우 침수·급류 (기상청 호우 특보 severity) ──
   // 강수 불쾌(쾌적 TCI)와 층을 분리 — "강수가 왜 두 번 깎이나"를 제거하고, 위험은
-  // 안전층에서 산사태 프록시와 함께 다룬다. rainMm<30(호우 미만)이면 요인 없음.
+  // 안전층에서 산사태와 함께 다룬다. rainMm<30(호우 미만)이면 요인 없음.
   if (heavyRainPts > 0) {
     const hrLabel =
       (input.rainMm ?? 0) >= HEAVY_RAIN.WARN_MM
@@ -278,15 +279,16 @@ export function computeSafetyScore(
     description: `산불위험 ${fireLevel}단계 — 산림청 '${FOREST_FIRE.LEVEL_LABEL[fireLevel]}'${fireNote}`,
   });
 
-  // ── 안전층: 산사태 (강우×지형 프록시, 공식 발령 상향 override) ──
-  const proxyLevel = landslideProxyLevel(input.rainMm, place.envType);
-  const landslideLevel = Math.max(proxyLevel, input.landslideLevel ?? 0) as 0 | 1 | 2;
+  // ── 안전층: 산사태 (산림청 공식 예보발령만 — 자체 추정 없음) ──
+  // 실내 시설은 한 단계 완화한다 (weights.ts landslideEffectiveLevel 참조) —
+  // 발령이 시군 단위라 그대로 먹이면 도심 상가 음식점이 산지와 같은 감점을 받는다.
+  const landslideLevel = normalizeLandslideLevel(input.landslideLevel ?? 0);
+  const lsLevel = landslideEffectiveLevel(landslideLevel, place.envType);
   let landslide = 0;
-  if (landslideLevel > 0) {
-    landslide = Math.round(Math.min(lsMax, lsBand[landslideLevel]));
-    const official = (input.landslideLevel ?? 0) >= landslideLevel;
-    const lsNote = landslideLevel >= 2 ? " → 방문 자제" : " → 주의";
-    const src = official ? "산림청 예보발령" : "예보 강수량·지형 기반 추정";
+  if (lsLevel > 0) {
+    landslide = Math.round(Math.min(lsMax, lsBand[lsLevel]));
+    const lsNote = lsLevel >= 2 ? " → 방문 자제" : " → 주의";
+    const indoorNote = lsLevel < landslideLevel ? " · 실내 시설 한 단계 완화" : "";
     factors.push({
       key: "landslide",
       label: "산사태",
@@ -296,7 +298,7 @@ export function computeSafetyScore(
       points: landslide,
       maxPoints: lsMax,
       level: levelForPoints(landslide, lsMax),
-      description: `산사태 ${LANDSLIDE.LEVEL_LABEL[landslideLevel]} — ${src}${lsNote}`,
+      description: `산사태 ${LANDSLIDE.LEVEL_LABEL[landslideLevel]} 발령 — 산림청 산사태정보시스템${indoorNote}${lsNote}`,
     });
   }
 

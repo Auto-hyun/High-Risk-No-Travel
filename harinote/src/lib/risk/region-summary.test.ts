@@ -130,34 +130,31 @@ describe("summarizeRegions", () => {
     expect(g.medianScore).toBe(86); // 대표 90 − (5−1) 집계 차이
   });
 
-  it("산사태는 노출 비율×상한(15)으로 소폭 반영 + 최고단계는 landslideAlert 배지", () => {
+  it("산사태 발령은 대표 관광지 값이 그대로 시군 점수에 들어간다 — 발령은 시군 단위", () => {
+    // 공식 발령은 시군 전역에 걸리므로 관광지마다 같은 단계다(노출 비율 집계 없음)
     const g = summarizeRegions([
-      mockPlace(1, 88, { factors: [f("heat", 12)], envType: "outdoor_general" }),
-      // 2곳 중 1곳(산악지)만 주의보(value=1) → 노출 50%
-      mockPlace(1, 40, { factors: [f("landslide", 45, 1)], envType: "outdoor_mountain" }),
+      mockPlace(1, 55, { factors: [f("landslide", 45, 1)], envType: "outdoor_general" }),
+      mockPlace(1, 55, { factors: [f("landslide", 45, 1)], envType: "outdoor_mountain" }),
     ]).find((r) => r.sigunguCode === 1)!;
     const ls = g.factors.find((x) => x.key === "landslide")!;
-    expect(ls.points).toBe(8); // 노출 50%×15=7.5→8 (최악 45를 헤드라인에 박지 않음)
-    expect(ls.value).toBe(50);
-    expect(ls.description).toContain("50%");
-    expect(g.medianScore).toBe(80); // 대표 88 − 시군 산사태 8
-    expect(g.landslideAlert).toBe(1); // 최고 단계는 배지로
+    expect(ls.points).toBe(45);
+    expect(g.medianScore).toBe(55);
+    expect(g.landslideAlert).toBe(1);
   });
 
-  it("경보(value=2)는 주의보보다 2배 가중 → 감점 더 큼", () => {
-    // 안전한 일반지 1곳을 섞어 비포화 상태로 — 그래야 2배 가중 차이가 드러남
-    const watch = summarizeRegions([
-      mockPlace(2, 90, { factors: [f("landslide", 45, 1)], envType: "outdoor_mountain" }),
-      mockPlace(2, 90, { factors: [], envType: "outdoor_general" }),
+  it("경보 시군은 배지 단계가 2다", () => {
+    const g = summarizeRegions([
+      mockPlace(2, 20, { factors: [f("landslide", 80, 2)], envType: "outdoor_general" }),
     ]).find((r) => r.sigunguCode === 2)!;
-    const warn = summarizeRegions([
-      mockPlace(2, 90, { factors: [f("landslide", 80, 2)], envType: "outdoor_mountain" }),
-      mockPlace(2, 90, { factors: [], envType: "outdoor_general" }),
-    ]).find((r) => r.sigunguCode === 2)!;
-    const wp = warn.factors.find((x) => x.key === "landslide")!.points;
-    const cp = watch.factors.find((x) => x.key === "landslide")!.points;
-    expect(cp).toBe(8); // 노출 50%(주의보)×15 = 7.5→8
-    expect(wp).toBe(15); // 경보 ×2 → 노출 100%×15 = 15
-    expect(wp).toBeGreaterThan(cp);
+    expect(g.landslideAlert).toBe(2);
+    expect(g.medianScore).toBe(20);
+  });
+
+  it("발령이 없으면 산사태 요인도 배지도 없다", () => {
+    const g = summarizeRegions([
+      mockPlace(3, 90, { factors: [f("heat", 10)], envType: "outdoor_general" }),
+    ]).find((r) => r.sigunguCode === 3)!;
+    expect(g.factors.some((x) => x.key === "landslide")).toBe(false);
+    expect(g.landslideAlert).toBe(0);
   });
 });

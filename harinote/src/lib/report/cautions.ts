@@ -169,7 +169,7 @@ export function buildPlanCautions(
         const label = LANDSLIDE.LEVEL_LABEL[c.worst as 0 | 1 | 2];
         add(
           bucket,
-          `${when} 산사태 위험이 ${label}입니다. 비가 온 뒤 산길과 계곡 구간은 돌아가세요.`,
+          `${when} 산림청 산사태 ${label}가 발령 중입니다. 비가 온 뒤 산길과 계곡 구간은 돌아가세요.`,
         );
         break;
       }

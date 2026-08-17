@@ -180,10 +180,8 @@ const envAxis = (
 
 const isFireActive = (c: Cell) => c.input.forestFireLevel >= 2;
 const isHeavyRainActive = (c: Cell) => (c.input.rainMm ?? 0) >= HEAVY_RAIN.PRE_MM;
-/** 공식 발령이 없어도 강우×지형 프록시로 켜질 수 있다 */
-const isLandslideActive = (c: Cell) =>
-  (c.input.landslideLevel ?? 0) > 0 ||
-  ((c.input.rainMm ?? 0) >= LANDSLIDE.WATCH_RAIN_MM && c.envType !== "indoor");
+/** 산사태는 산림청 공식 발령이 있는 셀에서만 감점이 발생한다 */
+const isLandslideActive = (c: Cell) => (c.input.landslideLevel ?? 0) > 0;
 const isEnvActive = (envType: PlaceEnvType) => (c: Cell) => c.envType === envType;
 /** 한파는 최저기온이 감점 시작점(-5℃) 아래로 내려간 셀에서만 의미가 있다 */
 const isColdActive = (c: Cell) =>

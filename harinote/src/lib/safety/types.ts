@@ -51,8 +51,7 @@ export interface RiskInput {
   forestFireLevel: 1 | 2 | 3 | 4;
   /**
    * 산사태 예보발령 0~2 (0 없음 / 1 주의보 / 2 경보 — 산림청 산사태정보시스템).
-   * 미제공(undefined)이면 점수엔진이 예보 강수량×지형으로 프록시 계산한다.
-   * 공식 발령이 있으면 프록시보다 상향으로만 반영(override) — landslideProxyLevel 주석 참조.
+   * 미제공(undefined)이면 발령 없음(감점 0)과 같게 계산된다 — 자체 추정은 하지 않는다.
    */
   landslideLevel?: 0 | 1 | 2;
   /** 최근접 응급의료기관까지 거리 km (보건복지부) */
@@ -68,7 +67,7 @@ export type RiskFactorKey =
   | "pm" // 미세먼지
   | "heavy_rain" // 호우 침수·급류 (기상청 호우 특보 severity, 안전층)
   | "forest_fire" // 산불
-  | "landslide" // 산사태 (강우×지형 프록시 + 산림청 예보발령 override)
+  | "landslide" // 산사태 (산림청 예보발령)
   | "medical"; // 응급의료 접근성
 
 export type RiskLevel = "low" | "moderate" | "high";

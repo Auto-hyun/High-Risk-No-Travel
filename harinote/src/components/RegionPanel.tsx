@@ -6,13 +6,8 @@ import { GRADE_LABEL } from "@/lib/safety/types";
 import SafetyScoreBadge from "@/components/SafetyScoreBadge";
 import RiskBreakdownBar from "@/components/RiskBreakdownBar";
 
-/** 산사태 경고 단계 라벨 (0 없음 · 1 주의보 · 2 경보) */
+/** 산사태 예보발령 단계 라벨 (0 없음 · 1 주의보 · 2 경보) */
 const LANDSLIDE_ALERT_LABEL = ["", "주의보", "경보"] as const;
-
-/** 산사태 배지 강도 — 위험노출 비율이 높을수록 진하게(옅음·중간·진함) */
-function landslideBadgeOpacity(pct: number): string {
-  return pct >= 50 ? "opacity-100" : pct >= 20 ? "opacity-70" : "opacity-40";
-}
 
 interface RegionPanelProps {
   regions: RegionSummary[];
@@ -95,8 +90,7 @@ export default function RegionPanel({
 
         {selected.landslideAlert > 0 && (
           <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
-            ⚠️ 산악·계곡 산사태 {LANDSLIDE_ALERT_LABEL[selected.landslideAlert]} · 관광지{" "}
-            {selected.landslideExposurePct}% 위험구역
+            ⚠️ 산사태 {LANDSLIDE_ALERT_LABEL[selected.landslideAlert]} 발령 중 (산림청)
           </div>
         )}
 
@@ -107,9 +101,9 @@ export default function RegionPanel({
               이 점수는 왜?
             </p>
             <p className="mb-3 text-xs text-slate-400">
-              날씨·산불은 시군 대표 야외지
+              날씨·산불·산사태는 시군 대표 야외지
               {selected.sampleName ? `(${selected.sampleName})` : ""} 기준 · 응급의료는
-              시군 중앙값 · 산사태는 시군 위험노출 비율
+              시군 중앙값
             </p>
             <RiskBreakdownBar factors={selected.factors} compact />
           </div>
@@ -147,9 +141,9 @@ export default function RegionPanel({
         <span className="flex shrink-0 items-center gap-1.5">
           {region.landslideAlert > 0 && (
             <span
-              className={`text-sm ${landslideBadgeOpacity(region.landslideExposurePct)}`}
-              title={`산사태 ${LANDSLIDE_ALERT_LABEL[region.landslideAlert]} · 관광지 ${region.landslideExposurePct}% 위험구역`}
-              aria-label={`산사태 ${LANDSLIDE_ALERT_LABEL[region.landslideAlert]} 노출 ${region.landslideExposurePct}%`}
+              className={`text-sm ${region.landslideAlert >= 2 ? "opacity-100" : "opacity-60"}`}
+              title={`산사태 ${LANDSLIDE_ALERT_LABEL[region.landslideAlert]} 발령 중 (산림청)`}
+              aria-label={`산사태 ${LANDSLIDE_ALERT_LABEL[region.landslideAlert]} 발령`}
             >
               ⚠️
             </span>

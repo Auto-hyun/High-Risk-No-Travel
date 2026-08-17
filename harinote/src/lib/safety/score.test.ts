@@ -207,9 +207,27 @@ describe("안전층 — 산불·산사태·응급의료", () => {
     expect(indoor.maxPoints).toBeLessThan(outdoor.maxPoints);
   });
 
-  it("산사태: 비 안 오면 요인 없음, 공식 경보(2)는 요인 발생", () => {
+  it("산사태: 발령 없으면 요인 없음, 공식 경보(2)는 요인 발생", () => {
     expect(run({ rainMm: 0 }, "outdoor_mountain").factors.some((f) => f.key === "landslide")).toBe(false);
     expect(run({ landslideLevel: 2 }, "outdoor_mountain").factors.some((f) => f.key === "landslide")).toBe(true);
+  });
+
+  it("실내는 산사태 발령을 한 단계 완화 — 주의보는 요인 없음, 경보는 주의보 밴드(45)", () => {
+    const watchIndoor = run({ landslideLevel: 1 }, "indoor");
+    expect(watchIndoor.factors.some((f) => f.key === "landslide")).toBe(false);
+
+    const warnIndoor = run({ landslideLevel: 2 }, "indoor").factors.find(
+      (f) => f.key === "landslide",
+    )!;
+    const warnOutdoor = run({ landslideLevel: 2 }, "outdoor_mountain").factors.find(
+      (f) => f.key === "landslide",
+    )!;
+    expect(warnIndoor.points).toBe(LANDSLIDE.POINTS_BY_LEVEL[1]);
+    expect(warnOutdoor.points).toBe(LANDSLIDE.POINTS_BY_LEVEL[2]);
+    // 표시 단계는 실제 발령 단계(경보) — 감점만 완화한다
+    expect(warnIndoor.value).toBe(2);
+    expect(warnIndoor.description).toContain("실내 시설 한 단계 완화");
+    expect(warnOutdoor.description).not.toContain("완화");
   });
 
   it("호우(침수·급류)는 안전층 별도 요인 — rainMm<30 없음, 호우급은 발생하고 disasterRisk에 포함", () => {
@@ -249,9 +267,9 @@ describe("재난 경보급 — 감점 앵커로 총점 보장(별도 override �
     expect(b.score).toBeLessThanOrEqual(ALERT_BAND_CAP);
   });
 
-  it("호우로 산악 프록시 경보(2)면 폭우 계곡은 방문 자제 수준", () => {
+  it("공식 발령이 없으면 폭우여도 산사태 요인은 없다 — 자체 추정 안 함", () => {
     const b = run({ rainMm: 90, rainProbPct: 90 }, "outdoor_mountain");
-    expect(b.score).toBeLessThanOrEqual(ALERT_BAND_CAP);
+    expect(b.factors.some((f) => f.key === "landslide")).toBe(false);
   });
 
   it("주의보급(산불 3·산사태 1)은 밴드 밖 — 감점만", () => {
