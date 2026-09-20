@@ -16,6 +16,7 @@ import { shouldAnchorOnAlternative } from "@/lib/course/half-day";
 import { buildChecklist } from "@/lib/report/checklist";
 import ReportActions from "@/components/ReportActions";
 import SafetyScoreBadge from "@/components/SafetyScoreBadge";
+import { roadKm } from "@/lib/reco/distance";
 import {
   parseProfile,
   profileParam,
@@ -232,8 +233,8 @@ export default async function ReportPage({ params, searchParams }: Props) {
                     {alt.title}
                   </Link>{" "}
                   <span className="tabular-nums">
-                    — 안전점수 {alt.safety.score}점 · {alt.distanceKm.toFixed(1)}
-                    km
+                    — 안전점수 {alt.safety.score}점 · 도로 약{" "}
+                    {roadKm(alt.distanceKm).toFixed(1)}km
                   </span>
                 </li>
               ))}

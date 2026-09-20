@@ -5,6 +5,7 @@ import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import Link from "next/link";
 import "leaflet/dist/leaflet.css";
 import type { PlaceMapProps } from "./PlaceMap";
+import { roadKm } from "@/lib/reco/distance";
 
 /** 기본 아이콘 이미지 의존 없이 CSS 원형 마커 사용 (번들러 아이콘 경로 문제 회피) */
 function dotIcon(kind: "target" | "alt"): ReturnType<typeof divIcon> {
@@ -61,7 +62,9 @@ export default function PlaceMapInner({
           <Popup>
             <strong>{alt.title}</strong>
             <br />
-            안전 점수 {alt.score}점 · {alt.distanceKm?.toFixed(1)}km
+            안전 점수 {alt.score}점
+            {alt.distanceKm !== undefined &&
+              ` · 약 ${roadKm(alt.distanceKm).toFixed(1)}km`}
             <br />
             <Link
               href={`/places/${alt.contentId}${profileQuery}`}

@@ -14,7 +14,7 @@ import {
   type ThemedCourseDto,
 } from "@/lib/course/themed";
 import { GRADE_LABEL, type Profile, type RiskLevel } from "@/lib/safety/types";
-import { haversineKm } from "@/lib/reco/distance";
+import { haversineKm, roadKm } from "@/lib/reco/distance";
 import { buildQuery, profileParam } from "@/components/search-params";
 import CourseRouteMap from "@/components/CourseRouteMap";
 import { useTravelPlan } from "@/hooks/useTravelPlan";
@@ -126,7 +126,7 @@ export default function CourseCard({ course, profile, onAdded }: Props) {
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <p className="text-sm font-semibold text-slate-600">
-            총 이동 약 {totalKm.toFixed(1)}km
+            총 이동 약 {roadKm(totalKm).toFixed(1)}km (도로 추정)
           </p>
           <button
             type="button"

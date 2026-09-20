@@ -5,6 +5,7 @@ import { CONTENT_TYPE_LABEL, ENV_TYPE_LABEL } from "@/lib/tour/types";
 import type { Profile } from "@/lib/safety/types";
 import SafetyScoreBadge from "@/components/SafetyScoreBadge";
 import { buildQuery, profileParam } from "@/components/search-params";
+import { roadKm } from "@/lib/reco/distance";
 
 const SLOT_META: Record<CourseStop["slot"], { emoji: string; label: string }> =
   {
@@ -41,8 +42,8 @@ export default function CourseTimeline({ course, profile }: Props) {
             <li key={place.contentId}>
               {stop.legKm !== undefined && (
                 <p className="my-2 ml-5 flex items-center gap-2 text-xs font-semibold text-slate-400">
-                  <span aria-hidden="true">↓</span> {stop.legKm.toFixed(1)}km
-                  이동
+                  <span aria-hidden="true">↓</span> 약{" "}
+                  {roadKm(stop.legKm).toFixed(1)}km 이동
                 </p>
               )}
               <div className="flex items-start gap-3">
@@ -104,7 +105,7 @@ export default function CourseTimeline({ course, profile }: Props) {
         })}
       </ol>
       <p className="mt-3 text-right text-sm font-semibold text-slate-600">
-        총 이동 약 {course.totalKm.toFixed(1)}km
+        총 이동 약 {roadKm(course.totalKm).toFixed(1)}km (도로 추정)
       </p>
     </div>
   );

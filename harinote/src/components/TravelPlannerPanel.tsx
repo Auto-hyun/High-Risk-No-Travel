@@ -28,7 +28,7 @@ import {
   type PlanSlot,
   type TravelPlan,
 } from "@/lib/travel-plan";
-import { haversineKm } from "@/lib/reco/distance";
+import { haversineKm, roadKm } from "@/lib/reco/distance";
 import { formatKoreanDate, todayISOSeoul } from "@/lib/date";
 import { diagnosePlan } from "@/lib/plan/diagnose-action";
 import { MAX_STOPS } from "@/lib/plan/diagnose";
@@ -707,7 +707,7 @@ export default function TravelPlannerPanel({
                 >
                   {legKm !== null && (
                     <p className="mb-1 pl-7 text-[10px] font-semibold text-slate-400">
-                      ↓ 직선 {legKm}km
+                      ↓ 약 {roadKm(legKm)}km
                     </p>
                   )}
                   <div className="flex items-center gap-2">
@@ -856,7 +856,7 @@ export default function TravelPlannerPanel({
                             {alt.score}
                           </span>
                           <span className="shrink-0 text-slate-400">
-                            {alt.distanceKm}km
+                            약 {roadKm(alt.distanceKm)}km
                           </span>
                         </button>
                       ))}

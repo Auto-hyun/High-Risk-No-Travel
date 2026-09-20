@@ -35,6 +35,7 @@ import { parseProfile, type SearchParamValue } from "@/components/search-params"
 import CourseRouteMap from "@/components/CourseRouteMap";
 import ReportActions from "@/components/ReportActions";
 import { GRADE_STYLE } from "@/components/SafetyScoreBadge";
+import { roadKm } from "@/lib/reco/distance";
 
 interface Props {
   searchParams: Promise<Record<string, SearchParamValue>>;
@@ -471,7 +472,7 @@ export default async function PlanReportPage({ searchParams }: Props) {
                               {alt.title}
                             </Link>{" "}
                             <span className="tabular-nums">
-                              ({alt.score}점 · {alt.distanceKm}km)
+                              ({alt.score}점 · 약 {roadKm(alt.distanceKm)}km)
                             </span>
                           </span>
                         ))}

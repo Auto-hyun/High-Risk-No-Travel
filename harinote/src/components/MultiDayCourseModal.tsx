@@ -21,6 +21,7 @@ import {
 import { formatKoreanDate } from "@/lib/date";
 import type { Profile } from "@/lib/safety/types";
 import type { Transport } from "@/lib/prefs";
+import { roadKm } from "@/lib/reco/distance";
 import {
   PLAN_SLOTS,
   SLOT_META,
@@ -302,7 +303,7 @@ export default function MultiDayCourseModal({
                                 </span>
                                 {row.fill.distanceKm > 0 && (
                                   <span className="shrink-0 text-xs text-slate-400">
-                                    {row.fill.distanceKm}km
+                                    약 {roadKm(row.fill.distanceKm)}km
                                   </span>
                                 )}
                                 <span

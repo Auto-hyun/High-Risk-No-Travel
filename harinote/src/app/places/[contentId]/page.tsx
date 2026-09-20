@@ -46,6 +46,7 @@ import {
 } from "@/lib/prefs";
 import { CAR_DISTANCE_KM, MAX_DISTANCE_KM } from "@/lib/reco/alternatives";
 import PrefsPersist from "@/components/PrefsPersist";
+import { roadKm } from "@/lib/reco/distance";
 
 interface Props {
   params: Promise<{ contentId: string }>;
@@ -556,7 +557,8 @@ export default async function PlaceDetailPage({ params, searchParams }: Props) {
                   end={activeEnd}
                   footer={
                     <p className="text-xs font-semibold text-teal-700">
-                      {alt.distanceKm.toFixed(1)}km · 안전점수 +
+                      직선 {alt.distanceKm.toFixed(1)}km · 도로 약{" "}
+                      {roadKm(alt.distanceKm).toFixed(1)}km · 안전점수 +
                       {alt.safety.score - safety.score}점
                     </p>
                   }
