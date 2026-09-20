@@ -5,7 +5,10 @@
 import { describe, expect, it } from "vitest";
 import type { PlaceWithSafety } from "@/lib/datasource";
 import type { RiskBreakdown } from "@/lib/safety/types";
-import { recommendAlternatives } from "@/lib/reco/alternatives";
+import {
+  MMR_LAMBDA,
+  recommendAlternatives,
+} from "@/lib/reco/alternatives";
 
 function makeSafety(score: number, weatherRisk = 0): RiskBreakdown {
   return {
@@ -182,5 +185,87 @@ describe("recommendAlternatives — 동점 처리·limit", () => {
   it("limit 지정 시 해당 개수만 반환", () => {
     const many = Array.from({ length: 8 }, () => makePlace());
     expect(recommendAlternatives(target, many, 2)).toHaveLength(2);
+  });
+});
+
+describe("recommendAlternatives — 다양성 재랭킹(MMR)", () => {
+  /** 같은 동네(37.9, 128.0) 같은 소분류로 뭉친 후보 n개 */
+  const cluster = (n: number, score: number) =>
+    Array.from({ length: n }, () =>
+      makePlace({ lat: 37.9, lng: 128.0, safety: makeSafety(score) }),
+    );
+
+  it("1순위는 MMR을 켜도 끈 것과 같다 — 기준을 바꾸지 않는다", () => {
+    const pool = [
+      ...cluster(5, 90),
+      makePlace({ lat: 37.7, lng: 127.8, cat3: "A02020400", safety: makeSafety(82) }),
+    ];
+    const on = recommendAlternatives(target, pool);
+    const off = recommendAlternatives(target, pool, 4, 30, { diversify: false });
+    expect(on[0].contentId).toBe(off[0].contentId);
+  });
+
+  it("한 군집이 목록을 독식하지 않는다 — 다른 동네가 끼어든다", () => {
+    // 같은 좌표·같은 소분류 후보가 상위를 메우고, 관련도가 한 칸 아래인
+    // "다른 동네" 후보가 하나 있는 상황 (MMR 풀 = limit 4 × 5 = 20곳)
+    const far = makePlace({
+      lat: 37.9,
+      lng: 128.28, // 군집에서 ≈24.6km, target에서 ≈27km (반경 30km 안)
+      safety: makeSafety(91),
+    });
+    const pool = [
+      ...cluster(4, 95),
+      far,
+      ...Array.from({ length: 15 }, (_, i) =>
+        makePlace({ lat: 37.9, lng: 128.0, safety: makeSafety(90 - i) }),
+      ),
+    ];
+
+    // MMR 없이는 상위 4칸을 한 군집이 전부 차지한다
+    const off = recommendAlternatives(target, pool, 4, 30, { diversify: false });
+    expect(off.map((r) => r.contentId)).not.toContain(far.contentId);
+
+    // MMR을 켜면 닮지 않은 후보가 들어온다
+    const on = recommendAlternatives(target, pool);
+    expect(on.map((r) => r.contentId)).toContain(far.contentId);
+  });
+
+  it("하드 제약은 재랭킹 뒤에도 그대로다 — 반경·최소개선·유형 관련성", () => {
+    const pool = [
+      ...cluster(6, 88),
+      makePlace({ lat: 38.4, safety: makeSafety(99) }), // 반경 밖
+      makePlace({ lat: 37.85, safety: makeSafety(72) }), // +2점 (최소개선 미달)
+      makePlace({
+        lat: 37.85,
+        contentTypeId: 39,
+        cat1: "A05",
+        cat2: "A0502",
+        cat3: "A05020100",
+        safety: makeSafety(99),
+      }), // 유형 관련성 0
+    ];
+    for (const alt of recommendAlternatives(target, pool)) {
+      expect(alt.distanceKm).toBeLessThanOrEqual(30);
+      expect(alt.safety.score).toBeGreaterThanOrEqual(target.safety.score + 5);
+      expect(alt.contentTypeId).toBe(target.contentTypeId);
+    }
+  });
+
+  it("limit과 중복 없음은 유지된다", () => {
+    const result = recommendAlternatives(target, cluster(12, 85));
+    expect(result).toHaveLength(4);
+    expect(new Set(result.map((r) => r.contentId)).size).toBe(4);
+  });
+
+  it("결정적이다 — 같은 입력을 두 번 넣으면 같은 순서", () => {
+    const pool = [...cluster(4, 91), ...cluster(4, 86)];
+    const a = recommendAlternatives(target, pool).map((r) => r.contentId);
+    const b = recommendAlternatives(target, pool).map((r) => r.contentId);
+    expect(a).toEqual(b);
+  });
+
+  it("λ는 관련도 우위 구간(0.5~1)에 있다 — 다양성이 순위를 뒤집지 않게", () => {
+    expect(MMR_LAMBDA).toBeGreaterThan(0.5);
+    expect(MMR_LAMBDA).toBeLessThan(1);
   });
 });

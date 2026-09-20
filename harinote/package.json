@@ -16,6 +16,7 @@
     "check:map": "tsx scripts/check-map-spread.ts",
     "check:mid": "tsx scripts/check-mid-forecast.ts",
     "check:sensitivity": "tsx scripts/safety-sensitivity.report.ts",
+    "check:reco": "tsx scripts/reco-quality.report.ts",
     "build:hospitals": "tsx scripts/build-hospitals.ts",
     "build:geo": "tsx scripts/build-gangwon-geo.ts",
     "build:lodging": "tsx scripts/build-lodging.ts"
